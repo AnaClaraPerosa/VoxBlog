@@ -8,7 +8,7 @@ class CreatePostService
 
   def call
     user = User.find_or_create_by!(login: @login)
-    post = user.posts.build(title: @title, body: @body, ip: @ip)
+    post = Post.new(title: @title, body: @body, ip: @ip, user: user)
 
     if post.save
       { success: true, post: post, user: user }

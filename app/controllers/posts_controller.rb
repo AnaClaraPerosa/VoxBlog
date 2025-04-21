@@ -28,17 +28,15 @@ class PostsController < ApplicationController
   end
 
   def ips
-    data = Post
-           .joins(:user)
-           .select('posts.ip, user.login')
-           .group_by(&:ip)
-           .map do |ip, posts|
+    posts = Post.includes(:user).select(:ip, :user_id)
+
+    grouped = posts.group_by(&:ip).map do |ip, posts_with_ip|
       {
         ip: ip,
-        logins: posts.map(&:login).uniq
+        logins: posts_with_ip.map { |post| post.user.login }.uniq
       }
     end
 
-    render json: data
+    render json: grouped
   end
 end

@@ -4,7 +4,7 @@ require 'net/http'
 require 'uri'
 require 'json'
 
-API_URL = 'http://localhost:3000'
+API_URL = 'http://localhost:3000'.freeze
 
 def create_post_with_rating(user_login, ip, title, body, should_rate)
   post_params = {
@@ -22,21 +22,23 @@ def create_post_with_rating(user_login, ip, title, body, should_rate)
   user_id = post_data.dig('user', 'id')
   post_id = post_data['id']
 
-  if should_rate && user_id && post_id
-    rating_value = rand(1..5)
-    rating_params = {
-      user_id: user_id,
-      post_id: post_id,
-      value: rating_value
-    }
+  return unless should_rate && user_id && post_id
 
-    uri = URI("#{API_URL}/ratings")
-    Net::HTTP.post(uri, rating_params.to_json, 'Content-Type' => 'application/json')
-  end
+  rating_value = rand(1..5)
+  rating_params = {
+    user_id: user_id,
+    post_id: post_id,
+    value: rating_value
+  }
+
+  uri = URI("#{API_URL}/ratings")
+  Net::HTTP.post(uri, rating_params.to_json, 'Content-Type' => 'application/json')
 end
 
 def generate_seeds_parallel(user_count: 100, post_count: 200_000, rating_probability: 0.75)
-  puts "Gerando #{user_count} usuários, #{post_count} posts, e cerca de #{(post_count * rating_probability).to_i} avaliações..."
+  Rails.logger.debug do
+    "Gerando #{user_count} usuários, #{post_count} posts, e cerca de #{(post_count * rating_probability).to_i} avaliações..."
+  end
 
   user_logins = Array.new(user_count) { "user_#{SecureRandom.hex(3)}" }
   ips = Array.new(50) { "192.168.0.#{rand(1..254)}" }
@@ -50,12 +52,10 @@ def generate_seeds_parallel(user_count: 100, post_count: 200_000, rating_probabi
 
     create_post_with_rating(user_login, ip, title, body, should_rate)
 
-    puts "Post #{i} criado com#{should_rate ? '' : 'out'} avaliação" if i % 1000 == 0
+    Rails.logger.debug { "Post #{i} criado com#{should_rate ? '' : 'out'} avaliação" } if (i % 1000).zero?
   end
 
-  puts 'Seeds finalizados com sucesso!'
+  Rails.logger.debug 'Seeds finalizados com sucesso!'
 end
 
-
 generate_seeds_parallel(user_count: 100, post_count: 200_000, rating_probability: 0.75)
-
