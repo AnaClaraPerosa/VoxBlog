@@ -1,3 +1,5 @@
+# Isola a lógica mais complexa e repetitiva dos controller
+
 class CreatePostService
   def initialize(title:, body:, login:, ip:)
     @title = title

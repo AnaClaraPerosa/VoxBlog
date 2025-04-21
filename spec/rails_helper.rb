@@ -7,7 +7,6 @@ begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
-
 end
 
 RSpec.configure do |config|
@@ -17,6 +16,6 @@ RSpec.configure do |config|
 
   config.use_transactional_fixtures = true
 
-  
+
   config.filter_rails_from_backtrace!
 end
