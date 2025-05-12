@@ -14,6 +14,19 @@ class PostsController < ApplicationController
     end
   end
 
+  def batch_create
+    posts_params = params.permit(posts: [:title, :body, :login, :ip])[:posts]
+
+    service = BatchCreatePostService.new(posts_params.map(&:to_h))
+    result = service.call
+
+    if result[:success]
+      render json: { created: result[:created] }, status: :created
+    else
+      render json: { errors: result[:errors] }, status: :unprocessable_entity
+    end
+  end
+
   def top
     n = params[:n].to_i
 
@@ -38,5 +51,5 @@ class PostsController < ApplicationController
     end
 
     render json: grouped
-  end
+  end 
 end

@@ -1,61 +1,63 @@
-require 'parallel'
-require 'securerandom'
 require 'net/http'
-require 'uri'
 require 'json'
+require 'securerandom'
 
-API_URL = 'http://localhost:3000'.freeze
+API_URL = 'http://localhost:3000'
 
-def create_post_with_rating(user_login, ip, title, body, should_rate)
-  post_params = {
-    title: title,
-    body: body,
-    login: user_login,
-    ip: ip
+TOTAL_POSTS = 200_000
+BATCH_SIZE = 500
+TOTAL_BATCHES = TOTAL_POSTS / BATCH_SIZE
+LOGINS = 100.times.map { |i| "user#{i}" }
+IPS = 50.times.map { |i| "192.168.0.#{i}" }
+
+def send_batch(posts_batch)
+  uri = URI("#{API_URL}/posts/batch")
+  body = { posts: posts_batch }.to_json
+
+  headers = {
+    'Content-Type' => 'application/json'
   }
 
-  uri = URI("#{API_URL}/posts")
-  res = Net::HTTP.post(uri, post_params.to_json, 'Content-Type' => 'application/json')
-  return unless res.is_a?(Net::HTTPSuccess)
+  response = Net::HTTP.post(uri, body, headers)
 
-  post_data = JSON.parse(res.body)
-  user_id = post_data.dig('user', 'id')
-  post_id = post_data['id']
-
-  return unless should_rate && user_id && post_id
-
-  rating_value = rand(1..5)
-  rating_params = {
-    user_id: user_id,
-    post_id: post_id,
-    value: rating_value
-  }
-
-  uri = URI("#{API_URL}/ratings")
-  Net::HTTP.post(uri, rating_params.to_json, 'Content-Type' => 'application/json')
-end
-
-def generate_seeds_parallel(user_count: 100, post_count: 200_000, rating_probability: 0.75)
-  Rails.logger.debug do
-    "Gerando #{user_count} usuários, #{post_count} posts, e cerca de #{(post_count * rating_probability).to_i} avaliações..."
+  unless response.is_a?(Net::HTTPSuccess)
+    puts "Erro ao enviar batch: #{response.code} - #{response.body}"
+    return false
   end
 
-  user_logins = Array.new(user_count) { "user_#{SecureRandom.hex(3)}" }
-  ips = Array.new(50) { "192.168.0.#{rand(1..254)}" }
-
-  Parallel.each(1..post_count, in_threads: 20) do |i|
-    user_login = user_logins.sample
-    ip = ips.sample
-    title = "Post #{i} - #{SecureRandom.hex(4)}"
-    body = "Corpo do post #{i} - #{SecureRandom.hex(12)}"
-    should_rate = rand < rating_probability
-
-    create_post_with_rating(user_login, ip, title, body, should_rate)
-
-    Rails.logger.debug { "Post #{i} criado com#{should_rate ? '' : 'out'} avaliação" } if (i % 1000).zero?
-  end
-
-  Rails.logger.debug 'Seeds finalizados com sucesso!'
+  json = JSON.parse(response.body)
+  puts "Batch de #{posts_batch.size} criado com sucesso (total enviado: #{json["created"]})"
+  true
 end
 
-generate_seeds_parallel(user_count: 100, post_count: 200_000, rating_probability: 0.75)
+created_count = 0
+
+TOTAL_BATCHES.times do |i|
+  posts = Array.new(BATCH_SIZE) do
+    {
+      title: SecureRandom.hex(8),
+      body: SecureRandom.hex(32),
+      login: LOGINS.sample,
+      ip: IPS.sample
+    }
+  end
+
+  success = false
+  tries = 0
+
+  while !success && tries < 3
+    success = send_batch(posts)
+    tries += 1
+    puts "Tentando novamente..." unless success
+    sleep 0.5 unless success
+  end
+
+  if success
+    created_count += BATCH_SIZE
+    puts "Total criado até agora: #{created_count}"
+  else
+    puts "Falha ao criar batch #{i + 1}, mesmo após 3 tentativas."
+  end
+end
+
+puts "Finalizado! Total de posts esperados: #{TOTAL_POSTS}, total criado: #{created_count}"
