@@ -40,4 +40,4 @@ group :development, :test do
   gem 'simplecov', require: false
 end
 
-gem 'rspec-rails', '~> 7.1', groups: %i[development test]
+gem 'rspec-rails', '~> 8.0', groups: %i[development test]
